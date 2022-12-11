@@ -1,5 +1,6 @@
 ---
 name: Build and Push Shopify App Image to GCP
+
 on:
   push:
     bracnhes: [ main ]
@@ -19,6 +20,9 @@ jobs:
       HOST: https://test-shopify-app-3xvwioytga-uc.a.run.app
       SERVICE: test-shopify-app-service
 
+      variables:
+      - name: image_name
+        value: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -31,7 +35,15 @@ jobs:
         export_default_credentials: true
 
     - name: Build Docker Image
-      run: docker build -f Dockerfile --build-arg SCOPES=${{ env.SCOPES }} --build-arg SHOPIFY_API_KEY=${{ secrets.SHOPIFY_API_KEY }} --build-arg HOST=${{ env.HOST }} --build-arg SHOPIFY_API_SECRET=${{ secrets.SHOPIFY_API_SECRET }} --build-arg NPM_TOKEN=${{ secrets.NPM_AUTH_TOKEN }} --build-arg PORT=${{ env.PORT }} --build-arg SERVER=${{ env.SERVER }} -t "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}" ./
+      run: >-
+        docker build
+        -f Dockerfile
+        --build-arg SCOPES=${{ env.SCOPES }}
+        --build-arg SHOPIFY_API_KEY=${{ secrets.SHOPIFY_API_KEY }}
+        --build-arg HOST=${{ env.HOST }}
+        --build-arg SHOPIFY_API_SECRET=${{ secrets.SHOPIFY_API_SECRET }}
+        --build-arg PORT=${{ env.PORT }}
+        -t ${{ variables.image_name }} ./
 
     - name: Configure Docker Client
       run: |-
@@ -41,7 +53,7 @@ jobs:
       env:
         GIT_TAG: v0.1.0
       run: |-
-        docker push "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}"
+        docker push ${{ variables.image_name }}
 
     - name: Deploy to Cloud Run
       id: deploy
@@ -49,4 +61,4 @@ jobs:
       with:
         service: ${{ env.SERVICE }}
         region: ${{ env.REGION }}
-        image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
+        image: ${{ variables.image_name }}
